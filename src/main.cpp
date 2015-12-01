@@ -38,15 +38,6 @@ using namespace std;
 	#define MESSAGE 	7920
 #endif
 
-int    FRAME_ERROR_LIMIT    =  100;
-bool   BER_SIMULATION_LIMIT =  false;
-double BIT_ERROR_LIMIT      =  1e-7;
-
-
-////////////////////////////////////////////////////////////////////////////////////
-
-double rendement;
-double Eb_N0;
 
 ////////////////////////////////////////////////////////////////////////////////////
 
@@ -58,21 +49,24 @@ int main(int argc, char* argv[])
 	printf("(II) MANIPULATION DE DONNEES (IEEE-754 - %ld bits)\n", 8*sizeof(int));
 	printf("(II) GENEREE : %s - %s\n", __DATE__, __TIME__);
 
+	int    FRAME_ERROR_LIMIT =  100;
+	double BIT_ERROR_LIMIT   =  1e-7;
+
 	double snr_min  = 0.50;
 	double snr_max  = 4.51;
 	double snr_step = 0.50;
-    int    NOMBRE_ITERATIONS = 200;
-	int    REAL_ENCODER      =  0;
-	int    STOP_TIMER_SECOND = -1;
-	bool   QPSK_CHANNEL      = false;
-    bool   Es_N0             = false; // FALSE => MODE Eb_N0
-    int NB_FRAMES_IN_PARALLEL = 1;
-    int algo = 0;
+    int algo                  = 0;
+    int NOMBRE_ITERATIONS     = 200;
+	int REAL_ENCODER          =  0;
+	int STOP_TIMER_SECOND     = -1;
+    int NB_FRAMES_IN_PARALLEL =  1;
+	bool   QPSK_CHANNEL         = false;
+    bool   Es_N0                = false;
+	bool   BER_SIMULATION_LIMIT = false;
 
     cudaSetDevice(0);
     cudaDeviceSynchronize();
     cudaThreadSynchronize();
-
 
 	//
 	// ON VA PARSER LES ARGUMENTS DE LIGNE DE COMMANDE
@@ -132,7 +126,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	rendement = (float)(1320)/(float)(NOEUD);
+	double rendement = (double)(NOEUD-PARITE)/(double)(NOEUD);
 	printf("(II) Code LDPC (N, K)     : (%d,%d)\n", NOEUD, PARITE);
 	printf("(II) Rendement du code    : %.3f\n", rendement);
 	printf("(II) # ITERATIONs du CODE : %d\n", NOMBRE_ITERATIONS);
@@ -147,7 +141,7 @@ int main(int argc, char* argv[])
 //	ADMM_GPU_Decoder decoder_1( NB_FRAMES_IN_PARALLEL );
 	ADMM_GPU_decoder_16b decoder_1( NB_FRAMES_IN_PARALLEL );
 
-	Eb_N0 = snr_min;
+	double Eb_N0 = snr_min;
 
 	while (Eb_N0 <= snr_max){
 
@@ -188,14 +182,9 @@ int main(int argc, char* argv[])
 
 			int mExeTime = 0;
 		    auto start   = chrono::steady_clock::now();
-
-		    float *Intrinsic_fix = simu_data_1.get_t_noise_data ();
-			int *Rprime_fix      = simu_data_1.get_t_decode_data();
-		    decoder_1.decode( Intrinsic_fix, Rprime_fix, NOMBRE_ITERATIONS );
-
+		    decoder_1.decode( simu_data_1.get_t_noise_data(), simu_data_1.get_t_decode_data(), NOMBRE_ITERATIONS );
 		    auto end     = chrono::steady_clock::now();
-		    auto diff    = end - start;
-		    time        += chrono::duration <double, milli> (diff).count();
+		    time        += chrono::duration <double, milli> (end - start).count();
 
             errCounter.generate();
 
@@ -210,7 +199,6 @@ int main(int argc, char* argv[])
             //
             // AFFICHAGE A L'ECRAN DE L'EVOLUTION DE LA SIMULATION SI NECESSAIRE
             //
-
 			if( (refresh.get_time_sec()) >= 2 )
             {
 				refresh.reset();
@@ -229,13 +217,15 @@ int main(int argc, char* argv[])
 		delete encoder_1;
 		// FIN DU MENAGE
 
-        if( (simu_timer.get_time_sec() >= STOP_TIMER_SECOND) && (STOP_TIMER_SECOND != -1) ){
+        if( (simu_timer.get_time_sec() >= STOP_TIMER_SECOND) && (STOP_TIMER_SECOND != -1) )
+        {
         	printf("(II) THE SIMULATION HAS STOP DUE TO THE (USER) TIME CONTRAINT.\n");
         	break;
         }
 
         if( BER_SIMULATION_LIMIT == true ){
-        	if( errCounter.ber_value() < BIT_ERROR_LIMIT ){
+        	if( errCounter.ber_value() < BIT_ERROR_LIMIT )
+        	{
         		printf("(II) THE SIMULATION HAS STOP DUE TO THE (USER) QUASI-ERROR FREE CONTRAINT.\n");
         		break;
         	}
