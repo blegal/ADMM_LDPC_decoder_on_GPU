@@ -21,9 +21,8 @@ using namespace std;
 
 #include "./cpp_src/CTimer/CTimer.h"
 #include "./cpp_src/CTrame/CTrame.h"
-#include "./cpp_src/CChanel/ChanelLibrary.h"
+#include "./cpp_src/CChanel/CChanelAWGN2.h"
 #include "./cpp_src/CEncoder/CFakeEncoder.h"
-#include "./cpp_src/CEncoder/GenericEncoder.h"
 #include "./cpp_src/CErrorAnalyzer/CErrorAnalyzer.h"
 #include "./cpp_src/CTerminal/CTerminal.h"
 
@@ -39,14 +38,10 @@ using namespace std;
 	#define MESSAGE 	7920
 #endif
 
-int    QUICK_STOP           =  true;
-int    FRAME_ERROR_LIMIT    =  50;
+int    FRAME_ERROR_LIMIT    =  100;
 bool   BER_SIMULATION_LIMIT =  false;
-bool   NORMALIZED_MIN_SUM   =  false;
 double BIT_ERROR_LIMIT      =  1e-7;
 
-int technique          = 0;
-int sChannel           = 1; // 1 = CHANNEL ON GPU (works only for 4000x2000 LDPC code yet
 
 ////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,9 +58,9 @@ int main(int argc, char* argv[])
 	printf("(II) MANIPULATION DE DONNEES (IEEE-754 - %ld bits)\n", 8*sizeof(int));
 	printf("(II) GENEREE : %s - %s\n", __DATE__, __TIME__);
 
-	double MinSignalSurBruit = 0.50;
-	double MaxSignalSurBruit = 4.51;
-	double PasSignalSurBruit = 0.50;
+	double snr_min  = 0.50;
+	double snr_max  = 4.51;
+	double snr_step = 0.50;
     int    NOMBRE_ITERATIONS = 200;
 	int    REAL_ENCODER      =  0;
 	int    STOP_TIMER_SECOND = -1;
@@ -84,7 +79,15 @@ int main(int argc, char* argv[])
 	//
 	for (p=1; p<argc; p++) {
 		if( strcmp(argv[p], "-min") == 0 ){
-			MinSignalSurBruit = atof( argv[p+1] );
+			snr_min = atof( argv[p+1] );
+			p += 1;
+
+		}else if( strcmp(argv[p], "-max") == 0 ){
+			snr_max = atof( argv[p+1] );
+			p += 1;
+
+		}else if( strcmp(argv[p], "-step") == 0 ){
+			snr_step = atof( argv[p+1] );
 			p += 1;
 
 		}else if( strcmp(argv[p], "-frames") == 0 ){
@@ -95,38 +98,12 @@ int main(int argc, char* argv[])
 			STOP_TIMER_SECOND = atoi( argv[p+1] );
 			p += 1;
 
-		}else if( strcmp(argv[p], "-enc") == 0 ){
-			REAL_ENCODER = 2;
-
-		}else if( strcmp(argv[p], "-encoder") == 0 ){
-			REAL_ENCODER = 1;
-
 		}else if( strcmp(argv[p], "-random") == 0 ){
             srand( time(NULL) );
-
-		}else if( strcmp(argv[p], "-max") == 0 ){
-			MaxSignalSurBruit = atof( argv[p+1] );
-			p += 1;
-
-		}else if( strcmp(argv[p], "-pas") == 0 ){
-			PasSignalSurBruit = atof( argv[p+1] );
-			p += 1;
-
-		}else if( strcmp(argv[p], "-stop") == 0 ){
-			QUICK_STOP = 1;
 
 		}else if( strcmp(argv[p], "-iter") == 0 ){
 			NOMBRE_ITERATIONS = atoi( argv[p+1] );
 			p += 1;
-
-		}else if( strcmp(argv[p], "-spa") == 0 ){
-			algo = 0;
-
-		}else if( strcmp(argv[p], "-oms") == 0 ){
-			algo = 1;
-
-		}else if( strcmp(argv[p], "-admm") == 0 ){
-			algo = 2;
 
 		}else if( strcmp(argv[p], "-fer") == 0 ){
 			FRAME_ERROR_LIMIT = atoi( argv[p+1] );
@@ -136,9 +113,6 @@ int main(int argc, char* argv[])
 			BER_SIMULATION_LIMIT =  true;
 			BIT_ERROR_LIMIT      = ( atof( argv[p+1] ) );
 			p += 1;
-
-		}else if( strcmp(argv[p], "-norm-min-sum") == 0 ){
-			NORMALIZED_MIN_SUM = true;
 
 		}else if( strcmp(argv[p], "-bpsk") == 0 ){
 			QPSK_CHANNEL = false;
@@ -163,10 +137,8 @@ int main(int argc, char* argv[])
 	printf("(II) Rendement du code    : %.3f\n", rendement);
 	printf("(II) # ITERATIONs du CODE : %d\n", NOMBRE_ITERATIONS);
     printf("(II) FER LIMIT FOR SIMU   : %d\n", FRAME_ERROR_LIMIT);
-	printf("(II) SIMULATION  RANGE    : [%.2f, %.2f], STEP = %.2f\n", MinSignalSurBruit,  MaxSignalSurBruit, PasSignalSurBruit);
+	printf("(II) SIMULATION  RANGE    : [%.2f, %.2f], STEP = %.2f\n", snr_min,  snr_max, snr_step);
 	printf("(II) MODE EVALUATION      : %s\n", ((Es_N0)?"Es/N0":"Eb/N0") );
-	printf("(II) MIN-SUM ALGORITHM    : %s\n", ((NORMALIZED_MIN_SUM)?"NORMALIZED":"OFFSET") );
-	printf("(II) FAST STOP MODE       : %d\n", QUICK_STOP);
 
 	CTimer simu_timer(true);
 	CTrame simu_data_1(NOEUD, PARITE, NB_FRAMES_IN_PARALLEL);
@@ -175,10 +147,9 @@ int main(int argc, char* argv[])
 //	ADMM_GPU_Decoder decoder_1( NB_FRAMES_IN_PARALLEL );
 	ADMM_GPU_decoder_16b decoder_1( NB_FRAMES_IN_PARALLEL );
 
-	Eb_N0 = MinSignalSurBruit;
+	Eb_N0 = snr_min;
 
-	#pragma omp parallel sections
-	while (Eb_N0 <= MaxSignalSurBruit){
+	while (Eb_N0 <= snr_max){
 
         //
         // ON CREE UN OBJET POUR LA MESURE DU TEMPS DE SIMULATION (REMISE A ZERO POUR CHAQUE Eb/N0)
@@ -189,17 +160,12 @@ int main(int argc, char* argv[])
         //
         // ALLOCATION DYNAMIQUE DES DONNESS NECESSAIRES A LA SIMULATION DU SYSTEME
         //
-		Encoder *encoder_1 = NULL;
-		if( REAL_ENCODER == 1 ){
-			encoder_1 = new GenericEncoder(&simu_data_1);
-		}else{
-			encoder_1 = new CFakeEncoder(&simu_data_1);
-		}
+		Encoder *encoder_1 = new CFakeEncoder(&simu_data_1);
 
 		//
 		// ON CREE LE CANAL DE COMMUNICATION (BRUIT GAUSSIEN)
 		//
-		CChanel *noise_1 = CreateChannel(sChannel, &simu_data_1, QPSK_CHANNEL, Es_N0);
+		CChanel *noise_1 = new CChanelAWGN2( &simu_data_1, 4, QPSK_CHANNEL, Es_N0);
 		noise_1->configure( Eb_N0 );
 
         CErrorAnalyzer errCounter(&simu_data_1, FRAME_ERROR_LIMIT);
@@ -256,7 +222,7 @@ int main(int argc, char* argv[])
 	    double debit = (1000.0f / (time/errCounter.nb_processed_frames())) * NOEUD / 1000.0f / 1000.0f;
 	    printf("debit %1.3f\n", debit);
 
-		Eb_N0 = Eb_N0 + PasSignalSurBruit;
+		Eb_N0 = Eb_N0 + snr_step;
 
 		// ON FAIT LE MENAGE PARMIS TOUS LES OBJETS CREES DYNAMIQUEMENT...
         delete noise_1;
