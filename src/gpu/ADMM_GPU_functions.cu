@@ -695,7 +695,7 @@ __global__ void ADMM_CN_kernel_deg6_16b_mod(
 //            const int ind      = IND + 768 * (frame_offset/128) + 128 * k + frame_offset%128;
 #endif
             const float  contr   = PTR[threadIdx.x + 128 * k];
-            float x              = (rho+un_m_rho) * ztemp[k] - contr;//__low2float(data) + (rho * (ztemp[k] - xpred) + un_m_rho * (ztemp[k] - __high2float(data)));
+            float x              = /*(rho+un_m_rho) * */ ztemp[k] - contr;//__low2float(data) + (rho * (ztemp[k] - xpred) + un_m_rho * (ztemp[k] - __high2float(data)));
             ptr[ indice +128 * k ]  = __halves2half2( __float2half(x), __float2half(ztemp[k]) );
         }
     }
