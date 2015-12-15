@@ -56,6 +56,21 @@ extern  __global__ void ADMM_CN_kernel_deg6_16b(
 	int *cn_synrome,
 	int N);
 
+extern __global__ void ADMM_VN_kernel_deg3_16b_mod(
+	const float *_LogLikelihoodRatio,
+	float *OutputFromDecoder,
+	float *LZr,
+	const unsigned int *t_row,
+	int N);
+
+
+extern  __global__ void ADMM_CN_kernel_deg6_16b_mod(
+	const float *OutputFromDecoder,
+	float *LZr,
+	const unsigned int *t_col1,
+	int *cn_synrome,
+	int N);
+
 extern  __global__ void ADMM_HardDecision(
 				float *OutputFromDecoder,
 				int   *HardDecision,
