@@ -28,7 +28,6 @@ void CTerminal::temp_report(){
                 (int)counter->nb_be(), tBER,
                 (float)counter->nb_be() / (float)counter->nb_fe(),
                 fpmn, bps);
-//        printf("(RT) FRA: %8ld | FE: %3d | BER: %2.2e | FPM: %3ld | BPS: %2.2f | ETA: ", counter->nb_processed_frames(), (int)counter->nb_fe(), tBER, fpmn, bps);
         ShowTime( temps );
         int eta  = (int)(((double)temps / (double)counter->nb_fe()) * (counter->fe_limit()));
         printf(" | ETR: ");
@@ -46,7 +45,6 @@ void CTerminal::temp_report(){
                 (int)counter->nb_be(), tBER,
                 (float)counter->nb_be() / 1.0,
                 fpmn, bps);
-//        printf("(RT) FRA: %8ld | FE: %3d | BER: <%2.2e | FPM: %3ld | BPS: %2.2f | ETA: ", counter->nb_processed_frames(), (int)counter->nb_fe(), tBER, fpmn, bps);
         ShowTime( temps );
         printf(" | ETR: INF.");
         printf("\r");
