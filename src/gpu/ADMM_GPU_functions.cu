@@ -667,16 +667,9 @@ __global__ void ADMM_CN_kernel_deg6_16b_mod(
     	#pragma unroll 6
         for(int k = 0; k < degCn; k++)
         {
-            const float xpred  = OutputFromDecoder[ trame_start + tab[ k ] ];
-            syndrom           += (xpred > 0.5);
-#if 0
-            const int ind      = degCn * i + k;
-#else
-//            const int ind      = IND + 768 * (frame_offset/128) + 128 * k + frame_offset%128;
-#endif
-        	const __half2 data = ptr[ indice +128 * k ];
-//        	if( (i%1320) == 0 || (i%1320) == 1319 ) printf("%4d [%d,%d,%d] => [%4d:%4d] %f %f\n", i, blockDim.x, blockIdx.x, threadIdx.x, ind-IND, ind, __high2float(data), __low2float(data));
-            //v_before_proj[k]  = rho * xpred + un_m_rho * zReplica[ind] - Lambda[ind];
+            const float xpred          = OutputFromDecoder[ trame_start + tab[ k ] ];
+            syndrom                   += (xpred > 0.5);
+        	const __half2 data         = ptr[ indice +128 * k ];
         	const auto contribution    = (rho * xpred) + (un_m_rho * __high2float(data)) - __low2float(data);
             v_proj[k]                  = contribution;
             PTR[threadIdx.x + 128 * k] = contribution;
@@ -689,13 +682,8 @@ __global__ void ADMM_CN_kernel_deg6_16b_mod(
         #pragma unroll 6
         for(int k = 0; k < degCn; k++)
         {
-#if 0
-            const int ind      = degCn * i + k;
-#else
-//            const int ind      = IND + 768 * (frame_offset/128) + 128 * k + frame_offset%128;
-#endif
-            const float  contr   = PTR[threadIdx.x + 128 * k];
-            float x              = /*(rho+un_m_rho) * */ ztemp[k] - contr;//__low2float(data) + (rho * (ztemp[k] - xpred) + un_m_rho * (ztemp[k] - __high2float(data)));
+            const float  contr      = PTR[threadIdx.x + 128 * k];
+            float x                 = ztemp[k] - contr;
             ptr[ indice +128 * k ]  = __halves2half2( __float2half(x), __float2half(ztemp[k]) );
         }
     }

@@ -165,7 +165,7 @@ ADMM_GPU_16b::~ADMM_GPU_16b()
 	Status = cudaFree(LZr);				ERROR_CHECK(Status, (char*)__FILE__, __LINE__);
 }
 
-#define CHECK_ERRORS
+//#define CHECK_ERRORS
 
 void ADMM_GPU_16b::decode(float* llrs, int* bits, int nb_iters)
 {
@@ -208,7 +208,7 @@ void ADMM_GPU_16b::decode(float* llrs, int* bits, int nb_iters)
 //        exit( 0 );
 
         // GESTION DU CRITERE D'ARRET DES CODEWORDS
-        if( (k%5) == 0 )
+        if( (k>=6) && ((k%2) == 0) )
         {
             reduce<<<blocksPerGridCheck, threadsPerBlock>>>(d_hDecision, CNs_per_load);
 #ifdef CHECK_ERRORS
@@ -226,8 +226,6 @@ void ADMM_GPU_16b::decode(float* llrs, int* bits, int nb_iters)
             }
             if( sum == 0 ) break;
         }
-
-        //if( k == 0 )     exit( 0 );
     }
 
     // LANCEMENT DU PROCESSUS DE DECODAGE SUR n ITERATIONS

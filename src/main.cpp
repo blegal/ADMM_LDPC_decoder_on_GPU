@@ -65,6 +65,7 @@ int main(int argc, char* argv[])
 	bool   QPSK_CHANNEL         = false;
     bool   Es_N0                = false;
 	bool   BER_SIMULATION_LIMIT = false;
+	int    codewords            = 1000000000;
 
     cudaSetDevice(0);
     cudaDeviceSynchronize();
@@ -99,6 +100,10 @@ int main(int argc, char* argv[])
 
 		}else if( strcmp(argv[p], "-iter") == 0 ){
 			NOMBRE_ITERATIONS = atoi( argv[p+1] );
+			p += 1;
+
+		}else if( strcmp(argv[p], "-codewords") == 0 ){
+			codewords = atoi( argv[p+1] );
 			p += 1;
 
 		}else if( strcmp(argv[p], "-fer") == 0 ){
@@ -177,9 +182,7 @@ int main(int argc, char* argv[])
 		while( 1 ){
 
 	        encoder_1->encode();
-
 	        noise_1->generate();
-
 	        errCounter.store_enc_bits();
 
 			int mExeTime = 0;
@@ -198,6 +201,11 @@ int main(int argc, char* argv[])
                 break;
             }
 
+			if ( errCounter.nb_processed_frames() >= codewords ){
+                break;
+            }
+
+
             //
             // AFFICHAGE A L'ECRAN DE L'EVOLUTION DE LA SIMULATION SI NECESSAIRE
             //
@@ -210,7 +218,7 @@ int main(int argc, char* argv[])
 
 		terminal.final_report();
 	    double debit = (1000.0f / (time/errCounter.nb_processed_frames())) * NOEUD / 1000.0f / 1000.0f;
-	    printf("debit %1.3f\n", debit);
+	    printf("%1.2f : %1.3f Mbps\n", Eb_N0, debit);
 
 		Eb_N0 = Eb_N0 + snr_step;
 
