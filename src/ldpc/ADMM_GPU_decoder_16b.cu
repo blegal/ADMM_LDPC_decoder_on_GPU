@@ -11,7 +11,7 @@
 
 #include "ADMM_GPU_decoder_16b.h"
 
-#include "../gpu/ADMM_GPU_functions.h"
+#include "../gpu/ADMM_GPU_16b.h"
 
 #if 0
 	#include "../codes/Constantes_4000x2000.h"
