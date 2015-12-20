@@ -22,7 +22,7 @@
 
 using namespace std;
 
-extern __global__ void ADMM_InitArrays(float *LZr,  int N);
+extern __global__ void ADMM_InitArrays_32b(float *LZr,  int N);
 
 extern __global__ void ADMM_VN_kernel_deg3(
 	const float *_LogLikelihoodRatio,

@@ -132,7 +132,7 @@ void ADMM_GPU_Decoder::decode(float* llrs, int* bits, int nb_iters)
     cudaMemcpyAsync(d_iLLR, llrs, VNs_per_load * sizeof(float), cudaMemcpyHostToDevice);
 
     /* INITIALISATION DU DECODEUR LDPC SUR GPU */
-    ADMM_InitArrays<<<blocksPerGridMsgs, threadsPerBlock>>>(LZr, MSGs_per_load);
+    ADMM_InitArrays_32b<<<blocksPerGridMsgs, threadsPerBlock>>>(LZr, MSGs_per_load);
     ERROR_CHECK(cudaGetLastError( ), __FILE__, __LINE__);
 
     ADMM_ScaleLLRs<<<blocksPerGridNode, threadsPerBlock>>>(d_iLLR, VNs_per_load);

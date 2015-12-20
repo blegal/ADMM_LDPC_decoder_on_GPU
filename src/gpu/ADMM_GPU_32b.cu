@@ -300,26 +300,13 @@ __device__ void projection_deg6_32b(float llr[], float results[])
 
 #define FLOAT2
 
-__global__ void ADMM_InitArrays(float* LZr, int N)
+__global__ void ADMM_InitArrays_32b(float* LZr, int N)
 {
-//    t.x = 0.00f;
-//    t.y = 0.50f;
-//	__half  t1 = __float2half (  );
-//	__half  t2 = __float2half ( 0.00f );
-//  __half2 t3 =__halves2half2 ( t1, t2 );
-//  float2 	__half22float2 ( const __half2 a )
-    // __high2float
-    // __low2float
     const int i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < N)
     {
-#ifdef FLOAT2
     	float2* ptr = reinterpret_cast<float2*>(LZr);
     	ptr[i]      = make_float2(0.00f, 0.50f);
-#else
-        Lambda  [i] = 0.00f;
-        zReplica[i] = 0.50f;
-#endif
     }
 }
 
