@@ -25,8 +25,8 @@
 #define SWAP_des(x,y) sort2_swap_des(&d##x, &d##y, &p##x, &p##y)
 __device__ void sort2_swap_des(float* dx, float* dy, int* px, int* py)
 {
-	const auto Dx = *dx, Dy = (*dy);
-	const auto Px = *px, Py = (*py);
+	const float Dx = *dx, Dy = (*dy);
+	const int   Px = *px, Py = (*py);
 	const bool test = (Dx > Dy);
 	(*dx) = fmaxf(Dx,Dy);
 	(*dy) = fminf(Dx,Dy);
@@ -39,8 +39,8 @@ __device__ void sort2_swap_des(float* dx, float* dy, int* px, int* py)
 #define SWAP_asc(x,y) sort2_swap_asc(&d##x, &d##y, &p##x, &p##y)
 __device__ void sort2_swap_asc(float* dx, float* dy, int* px, int* py)
 {
-	const auto Dx = *dx, Dy = (*dy);
-	const auto Px = *px, Py = (*py);
+	const float Dx = *dx, Dy = (*dy);
+	const int   Px = *px, Py = (*py);
 	const bool test = (Dx < Dy);
 	(*dx) = fminf(Dx,Dy);
 	(*dy) = fmaxf(Dx,Dy);
@@ -53,8 +53,8 @@ __device__ void sort2_swap_asc(float* dx, float* dy, int* px, int* py)
 __device__ void sort6_swap(float d[6], int p[6])
 {
 	#define SWAP SWAP_des
-    auto p0 = 0;    auto p1 = 1;    auto p2 = 2;
-    auto p3 = 3;    auto p4 = 4;    auto p5 = 5;
+	int p0 = 0;    int p1 = 1;    int p2 = 2;
+	int p3 = 3;    int p4 = 4;    int p5 = 5;
     float d0 = d[0]; float d1 = d[1]; float d2 = d[2];
     float d3 = d[3]; float d4 = d[4]; float d5 = d[5];
     SWAP(1, 2); SWAP(0, 2); SWAP(0, 1); SWAP(4, 5);
@@ -70,8 +70,8 @@ __device__ void sort6_swap(float d[6], int p[6])
 __device__ void sort6_swap(float illr[6], float rllr[6], int ipos[6], int rpos[6])
 {
 	#define SWAP SWAP_asc
-    auto  p0 = ipos[0]; auto  p1 = ipos[1]; auto  p2 = ipos[2];
-    auto  p3 = ipos[3]; auto  p4 = ipos[4]; auto  p5 = ipos[5];
+	int  p0 = ipos[0]; int  p1 = ipos[1]; int  p2 = ipos[2];
+	int  p3 = ipos[3]; int  p4 = ipos[4]; int  p5 = ipos[5];
     float d0 = illr[0]; float d1 = illr[1]; float d2 = illr[2];
     float d3 = illr[3]; float d4 = illr[4]; float d5 = illr[5];
     SWAP(1, 2); SWAP(0, 2); SWAP(0, 1); SWAP(4, 5);
@@ -312,11 +312,11 @@ __global__ void ADMM_VN_kernel_deg3_16b(
 	const float* _LogLikelihoodRatio, float* OutputFromDecoder, float* LZr, const unsigned int *t_row, int N)
 {
     const int i             = blockDim.x * blockIdx.x + threadIdx.x;
-	constexpr float mu      = 3.0f;
-	constexpr float  alpha  = 0.8;
-	constexpr float _amu_   = alpha / mu;
-	constexpr float _2_amu_ = _amu_+ _amu_;
-    constexpr float factor  = 1.0f / (3.0f - _2_amu_);
+	const float mu      = 3.0f;
+	const float  alpha  = 0.8;
+	const float _amu_   = alpha / mu;
+	const float _2_amu_ = _amu_+ _amu_;
+    const float factor  = 1.0f / (3.0f - _2_amu_);
     const int   degVn       = 3;
 	const __half2* ptr      = reinterpret_cast<__half2*>(LZr);
 
@@ -343,9 +343,9 @@ __global__ void ADMM_CN_kernel_deg6_16b(
 	const float *OutputFromDecoder, float *Lzr, const unsigned int *t_col1, int *cn_synrome, int N)
 {
     const int i = blockDim.x * blockIdx.x + threadIdx.x; // NUMERO DU CHECK NODE A CALCULER
-    constexpr float rho      = 1.9f;
-    constexpr float un_m_rho = 1.0f - rho;
-    constexpr int   degCn    = 6;
+    const float rho      = 1.9f;
+    const float un_m_rho = 1.0f - rho;
+    const int   degCn    = 6;
     float v_proj[6];
     float ztemp [6];
     __half2* ptr = reinterpret_cast<__half2*>(Lzr);
@@ -400,11 +400,11 @@ __global__ void ADMM_VN_kernel_deg3_16b_mod(
 	const float* _LogLikelihoodRatio, float* OutputFromDecoder, float* LZr, const unsigned int *t_row, int N)
 {
     const int i             = blockDim.x * blockIdx.x + threadIdx.x;
-	constexpr float mu      = 3.0f;
-	constexpr float  alpha  = 0.8;
-	constexpr float _amu_   = alpha / mu;
-	constexpr float _2_amu_ = _amu_+ _amu_;
-    constexpr float factor  = 1.0f / (3.0f - _2_amu_);
+	const float mu      = 3.0f;
+	const float  alpha  = 0.8;
+	const float _amu_   = alpha / mu;
+	const float _2_amu_ = _amu_+ _amu_;
+    const float factor  = 1.0f / (3.0f - _2_amu_);
     const int   degVn       = 3;
 	const __half2* ptr      = reinterpret_cast<__half2*>(LZr);
 
@@ -432,9 +432,9 @@ __global__ void ADMM_CN_kernel_deg6_16b_mod(
 	const float *OutputFromDecoder, float *Lzr, const unsigned int *t_col1, int *cn_synrome, int N)
 {
     const int i = blockDim.x * blockIdx.x + threadIdx.x; // NUMERO DU CHECK NODE A CALCULER
-    constexpr float rho      = 1.9f;
-    constexpr float un_m_rho = 1.0f - rho;
-    constexpr int   degCn    = 6;
+    const float rho      = 1.9f;
+    const float un_m_rho = 1.0f - rho;
+    const int   degCn    = 6;
     float v_proj[6];
     float ztemp [6];
     __half2* ptr = reinterpret_cast<__half2*>(Lzr);
