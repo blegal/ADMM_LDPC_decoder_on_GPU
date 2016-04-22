@@ -21,6 +21,32 @@
 #include <cuda_fp16.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
+__device__ inline void fsort2(float* a, float *b)
+{
+    const float ymm0 = (*a);
+    const float ymm1 = (*b);
+    const float ymm3 = fmax(ymm0, ymm1);
+    (*b) = fmin(ymm0, ymm1);
+    (*a) = ymm3;
+}
+
+__device__ inline void sort6(const float src[6], float dst[6]){
+    auto d0 = src[0];
+    auto d1 = src[1];
+	auto d2 = src[2];
+	auto d3 = src[3];
+	auto d4 = src[4];
+	auto d5 = src[5];
+	fsort2(&d1, &d2); fsort2(&d0, &d2); fsort2(&d0, &d1); fsort2(&d4, &d5);
+	fsort2(&d3, &d5); fsort2(&d3, &d4); fsort2(&d0, &d3); fsort2(&d1, &d4);
+    fsort2(&d2, &d5); fsort2(&d2, &d4); fsort2(&d1, &d3); fsort2(&d2, &d3);
+    dst[0] = d0;
+    dst[1] = d1;
+    dst[2] = d2;
+    dst[3] = d3;
+    dst[4] = d4;
+    dst[5] = d5;
+}
 
 #define SWAP_des(x,y) sort2_swap_des(&d##x, &d##y, &p##x, &p##y)
 __device__ void sort2_swap_des(float* dx, float* dy, int* px, int* py)
@@ -311,14 +337,14 @@ __global__ void ADMM_InitArrays_16b(float* LZr, int N)
 __global__ void ADMM_VN_kernel_deg3_16b(
 	const float* _LogLikelihoodRatio, float* OutputFromDecoder, float* LZr, const unsigned int *t_row, int N)
 {
-    const int i             = blockDim.x * blockIdx.x + threadIdx.x;
+    const int i         = blockDim.x * blockIdx.x + threadIdx.x;
 	const float mu      = 3.0f;
 	const float  alpha  = 0.8;
 	const float _amu_   = alpha / mu;
 	const float _2_amu_ = _amu_+ _amu_;
     const float factor  = 1.0f / (3.0f - _2_amu_);
-    const int   degVn       = 3;
-	const __half2* ptr      = reinterpret_cast<__half2*>(LZr);
+    const int   degVn   = 3;
+	const __half2* ptr  = reinterpret_cast<__half2*>(LZr);
 
     if (i < N){
         float temp                  = -_LogLikelihoodRatio[i];
@@ -338,6 +364,8 @@ __global__ void ADMM_VN_kernel_deg3_16b(
         OutputFromDecoder[i] = fmaxf(fminf(xx, 1.0f), 0.0f);
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 __global__ void ADMM_CN_kernel_deg6_16b(
 	const float *OutputFromDecoder, float *Lzr, const unsigned int *t_col1, int *cn_synrome, int N)
@@ -427,11 +455,160 @@ __global__ void ADMM_VN_kernel_deg3_16b_mod(
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+__device__ void proj_deg6_v2(float llr[], float v_clip[])
+{
+	const int length = 6;
+
+	#pragma unroll 6
+	for(int i = 0;i < length; i++)
+	{
+		v_clip[i]  = fmin(fmax(llr[i],  0.0f), 1.0f);
+	}
+
+	int   sum_f  = 0;
+	float f[length];
+	#pragma unroll 6
+	for(int i = 0;i < length; i++)
+	{
+		const float value = (v_clip[i] > 0.5f);
+		f[i]   = value;
+		sum_f += (int)value;
+	}
+
+	int is_even = (int)sum_f & 0x01;
+
+	int indice = 0;
+	float minimum = fabs( (0.5f - v_clip[0]) );// < 0 ? (v_clip[0]-0.5) : (0.5f-v_clip[0]);
+	#pragma unroll 6
+	for(int i = 1; i < length; i++)
+	{
+		float tmp = fabs( 0.5f - v_clip[i] );//(tmp < 0) ? -tmp : tmp;
+		indice    = (tmp < minimum)? i : indice;
+	}
+
+	if (is_even == 0)
+	{
+		f[indice] = 1 - f[indice];
+	}
+
+	float v_T[length];
+	#pragma unroll 6
+	for(int i = 0; i < length; i++)
+	{
+		const float value = 1.0f - llr[i];
+		v_T[i] = (f[i] == 1) ? value : llr[i];
+	}
+
+	int   sum_v_T= 0;
+
+	#pragma unroll 6
+	for(int i = 0;i < length; i++)
+	{
+		sum_v_T   += fmin(fmax(v_T[i],  0.0f), 1.0f);
+	}
+
+	if ( sum_v_T >= 1.0f )
+	{
+		return;
+	}
+
+	float sorted[length];
+	sort6( v_T, sorted );
+
+
+		float sum_Mu=0;
+		float s[length];
+		#pragma unroll 6
+		for(int i = 0; i < length; i++)
+		{
+			sum_Mu += sorted[i];
+			s[i]    = (sum_Mu - 1.0f) / (1 + i);
+		}
+
+		// get Rho
+
+		float sRho = s[0];
+		#pragma unroll 5
+		for(int i = 1; i < length; i++)
+		{
+			sRho = (sorted[i] > s[i]) ? s[i] : sRho;
+		}
+
+		float u[length];
+		#pragma unroll 6
+		for(int i = 0;i < length; i++)
+		{
+			const float ui = fmax (v_T[i] - sRho, 0.0f);
+			v_clip[i] = ( f[i] == 1 ) ? (1.0f - ui) : ui;
+		}
+
+//		#pragma unroll 6
+//		for(int i = 0;i < length; i++)
+//		{
+//			v_clip[i] = u_T[i];
+//		}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 __global__ void ADMM_CN_kernel_deg6_16b_mod(
 	const float *OutputFromDecoder, float *Lzr, const unsigned int *t_col1, int *cn_synrome, int N)
 {
     const int i = blockDim.x * blockIdx.x + threadIdx.x; // NUMERO DU CHECK NODE A CALCULER
+    const float rho      = 1.9f;
+    const float un_m_rho = 1.0f - rho;
+    const int   degCn    = 6;
+    float v_proj[6];
+    float ztemp [6];
+    __half2* ptr = reinterpret_cast<__half2*>(Lzr);
+    float*   PTR = reinterpret_cast<float*>(sdata);
+
+    if (i < N){
+        const int frame_id     = i/1320;
+        const int frame_offset = i%1320;
+        const int trame_start  = 2640 * (i/1320);
+        const int IND          = 8448 * frame_id; // offset to access mesages from current frame
+        const int indice       = IND + 768 * (frame_offset/128) + frame_offset%128;
+
+    	int syndrom = 0;
+
+    	unsigned short* cptr         = (unsigned short*)t_col1;//)[]);
+        const uint3 offset           = reinterpret_cast<uint3*>( cptr )[ frame_offset ];
+        const unsigned int    TAB[3] = {offset.x, offset.y, offset.z};
+        const unsigned short* tab    = (const unsigned short*)TAB;
+
+    	#pragma unroll 6
+        for(int k = 0; k < degCn; k++)
+        {
+            const float xpred          = OutputFromDecoder[ trame_start + tab[ k ] ];
+            syndrom                   += (xpred > 0.5);
+        	const __half2 data         = ptr[ indice +128 * k ];
+        	const auto contribution    = (rho * xpred) + (un_m_rho * __high2float(data)) - __low2float(data);
+            v_proj[k]                  = contribution;
+            PTR[threadIdx.x + 128 * k] = contribution;
+
+        }
+        cn_synrome[i] = syndrom & 0x01;
+
+        proj_deg6_v2(v_proj, ztemp);
+        //projection_deg6(v_proj, ztemp);
+
+        #pragma unroll 6
+        for(int k = 0; k < degCn; k++)
+        {
+            const float  contr      = PTR[threadIdx.x + 128 * k];
+            float x                 = ztemp[k] - contr;
+            ptr[ indice +128 * k ]  = __halves2half2( __float2half(x), __float2half(ztemp[k]) );
+        }
+    }
+}
+
+__global__ void ADMM_CN_kernel_deg6_16b_mod2(
+	const float *OutputFromDecoder, float *Lzr, const unsigned int *t_col1, int *cn_synrome, int N)
+{
+    int i = blockDim.x * blockIdx.x + threadIdx.x; // NUMERO DU CHECK NODE A CALCULER
     const float rho      = 1.9f;
     const float un_m_rho = 1.0f - rho;
     const int   degCn    = 6;
@@ -477,4 +654,55 @@ __global__ void ADMM_CN_kernel_deg6_16b_mod(
             ptr[ indice +128 * k ]  = __halves2half2( __float2half(x), __float2half(ztemp[k]) );
         }
     }
+
+    //////////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////////
+
+    __syncthreads();
+    unsigned int tid      = threadIdx.x;
+    unsigned int gridSize = blockDim.x * 2 * gridDim.x;
+
+    int mySum = 0;
+
+    // we reduce multiple elements per thread.  The number is determined by the
+    // number of active thread blocks (via gridDim).  More blocks will result
+    // in a larger gridSize and therefore fewer elements per thread
+    while (i < N)
+    {
+        mySum += cn_synrome[i];
+        // ensure we don't read out of bounds
+        if (i + blockDim.x < N)
+            mySum += cn_synrome[i+blockDim.x];
+        i += gridSize;
+    }
+
+    // each thread puts its local sum into shared memory
+    sdata[tid] = mySum;
+    __syncthreads();
+
+    // do reduction in shared mem
+    if (blockDim.x >= 1024) { if (tid < 512) { sdata[tid] = mySum = mySum + sdata[tid + 512]; } __syncthreads(); }
+    if (blockDim.x >=  512) { if (tid < 256) { sdata[tid] = mySum = mySum + sdata[tid + 256]; } __syncthreads(); }
+    if (blockDim.x >=  256) { if (tid < 128) { sdata[tid] = mySum = mySum + sdata[tid + 128]; } __syncthreads(); }
+    if (blockDim.x >=  128) { if (tid <  64) { sdata[tid] = mySum = mySum + sdata[tid +  64]; } __syncthreads(); }
+
+    // avoid bank conflict
+    if (tid < 32)
+    {
+        // now that we are using warp-synchronous programming (below)
+        // we need to declare our shared memory volatile so that the compiler
+        // doesn't reorder stores to it and induce incorrect behavior.
+        volatile int* smem = sdata;
+        if (blockDim.x >=  64) { smem[tid] = mySum = mySum + smem[tid + 32]; }
+        if (blockDim.x >=  32) { smem[tid] = mySum = mySum + smem[tid + 16]; }
+        if (blockDim.x >=  16) { smem[tid] = mySum = mySum + smem[tid +  8]; }
+        if (blockDim.x >=   8) { smem[tid] = mySum = mySum + smem[tid +  4]; }
+        if (blockDim.x >=   4) { smem[tid] = mySum = mySum + smem[tid +  2]; }
+        if (blockDim.x >=   2) { smem[tid] = mySum = mySum + smem[tid +  1]; }
+    }
+
+    // write result for this block to global mem
+    if (tid == 0)
+    	cn_synrome[blockIdx.x] = sdata[0];
 }

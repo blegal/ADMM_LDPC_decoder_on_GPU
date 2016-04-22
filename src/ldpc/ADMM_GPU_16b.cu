@@ -204,11 +204,9 @@ void ADMM_GPU_16b::decode(float* llrs, int* bits, int nb_iters)
 #ifdef CHECK_ERRORS
         ERROR_CHECK(cudaGetLastError( ), __FILE__, __LINE__);
 #endif
-//        Status = cudaMemcpy(h_hDecision, d_hDecision, blocksPerGridCheck * sizeof(int), cudaMemcpyDeviceToHost);
-//        exit( 0 );
 
         // GESTION DU CRITERE D'ARRET DES CODEWORDS
-        if( (k>=6) && ((k%2) == 0) )
+        if( ( k >= 2 ) && ( (k%2) == 0) )
         {
             reduce<<<blocksPerGridCheck, threadsPerBlock>>>(d_hDecision, CNs_per_load);
 #ifdef CHECK_ERRORS
